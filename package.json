@@ -1,0 +1,33 @@
+{
+  "name": "task-manager-app",
+  "version": "1.0.0",
+  "description": "A simple task manager application built with Node.js and Express.",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "task manager",
+    "node.js",
+    "express",
+    "ejs"
+  ],
+  "author": "Bassam B. Ali",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.3",
+    "nodemon": "^3.1.4"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  }
+}
