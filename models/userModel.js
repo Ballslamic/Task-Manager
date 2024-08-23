@@ -2,11 +2,12 @@ const mongoose = require("mongoose");
 const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema({
-  userName: { type: String, required: true },
-  email: { type: String, required: true },
-  password: { type: String, required: true },
+  userName: { type: String, required: true }, // User's username 
+  email: { type: String, required: true }, // User's email address 
+  password: { type: String, required: true }, // User's password
 });
 
+// Hask the password befor saving to the database
 userSchema.pre('save', async function (next) {
   const user = this;
 
@@ -17,5 +18,5 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-const User = mongoose.model("User", userSchema);
-module.exports = User;
+const User = mongoose.model("User", userSchema); // Create user model
+module.exports = User; // Export user model for use in other files
