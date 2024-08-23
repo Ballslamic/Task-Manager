@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
 });
 
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
   const user = this;
 
   if (user.isModified('password')) {
