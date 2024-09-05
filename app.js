@@ -1,31 +1,33 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const mongoose = require("mongoose");
-const userRoute = require("./routes/userRoute");
-const taskRoute = require("./routes/taskRoute");
-const categoryRoute = require("./routes/categoryRoute");
-
-require("dotenv").config(); // Load environment variables from .env file
-require("./models/dbModel"); // Connect to the database
-require("./models/categoryModel"); // Load the Category model
-require("./models/taskModel"); // Load the Task model
-require("./models/userModel"); // Load the User model
-const PORT = process.env.PORT; // Define the port from environment variables
+const express = require('express');
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+const userRoutes = require('./routes/userRoutes');
+const taskRoutes = require('./routes/taskRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+require('dotenv').config();
+require('./models/dbmodel');
 
 const app = express();
-// Middlware
-app.use(bodyParser.json()); // Middleware to parse JSON bodies in requests
-app.use("/user", userRoute); // Routes for user-related endpoints
-app.use("/task", taskRoute); // Routes for task-related endpoints
-app.use("/category", categoryRoute); // Routes for category-related endpoints
-// app.set('view engine', 'ejs');
 
-app.get("/", (req, res) => {
+// Middleware
+app.use(bodyParser.json());
+app.use('/user', userRoutes);
+app.use('/task', taskRoutes);
+app.use('/category', categoryRoutes);
+
+app.get('/', (req, res) => {
     res.json({
-        message: "Task Manager App is working! :D",
+        message: 'Task Manager App is working! :D'
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}.`);
-});
+// Export the app instead of starting the server here
+module.exports = app;
+
+// If you need to start the server separately (e.g., for production)
+if (require.main === module) {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}.`);
+    });
+}
