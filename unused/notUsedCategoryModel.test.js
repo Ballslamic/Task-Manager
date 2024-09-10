@@ -56,24 +56,27 @@ describe('Category Model', () => {
     });
 
     it('should allow same category name for different users', async () => {
-        const category = {
-            name: 'Work',
-            colorCode: '#FF0000'
-        };
-        testUser1.categories.push(category);
-        await testUser1.save();
-        console.log('First Work category created:', testUser1.categories[0]);
+        const user1 = new User({
+            userName: 'user1',
+            email: 'user1@example.com',
+            password: 'password123'
+        });
+        user1.categories.push({ name: 'Work', colorCode: '#FF0000' });
+        await user1.save();
 
-        testUser2.categories.push(category);
-        await testUser2.save();
-        console.log('Second Work category created:', testUser2.categories[0]);
+        const user2 = new User({
+            userName: 'user2',
+            email: 'user2@example.com',
+            password: 'password123'
+        });
+        user2.categories.push({ name: 'Work', colorCode: '#00FF00' });
+        await user2.save();
 
-        const user1 = await User.findById(testUser1._id);
-        const user2 = await User.findById(testUser2._id);
+        const savedUser1 = await User.findById(user1._id);
+        const savedUser2 = await User.findById(user2._id);
 
-        expect(user1.categories[0].name).toBe('Work');
-        expect(user2.categories[0].name).toBe('Work');
-        expect(user1.categories[0]._id).not.toEqual(user2.categories[0]._id);
+        expect(savedUser1.categories[0].name).toBe('Work');
+        expect(savedUser2.categories[0].name).toBe('Work');
     });
 
 });

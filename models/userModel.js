@@ -36,18 +36,7 @@ const userSchema = new mongoose.Schema({
     minlength: 7, // Minimum password length
     trim: true, // Removes any surrounding spaces
   },
-  categories: {
-    type: [categorySchema],
-    validate: {
-      // Custom validator to ensure category names are unique for a user
-      validator: function(categories) {
-        const categoryNames = categories.map(cat => cat.name);
-        const uniqueNames = new Set(categoryNames);
-        return categoryNames.length === uniqueNames.size;
-      },
-      message: 'Duplicate category names are not allowed'
-    }
-  },
+  categories: [categorySchema],
   tokens: [{
     token: {
       type: String,
@@ -61,19 +50,19 @@ const userSchema = new mongoose.Schema({
 });
 
 // Custom method to convert user object to JSON
-userSchema.methods.toJSON = function() {
+userSchema.methods.toJSON = function () {
   const user = this;
   const userObject = user.toObject();
-  
+
   // Remove sensitive information before sending user data
   delete userObject.password;
   delete userObject.tokens;
-  
+
   return userObject;
 };
 
 // Custom method to generate authentication token with expiration
-userSchema.methods.generateAuthToken = async function() {
+userSchema.methods.generateAuthToken = async function () {
   const user = this;
   // Create a new JWT token with 30 minutes expiration
   const token = jwt.sign(
@@ -81,22 +70,22 @@ userSchema.methods.generateAuthToken = async function() {
     process.env.JWT_SECRET,
     { expiresIn: '30m' }
   );
-  
+
   // Add the token to the user's tokens array with expiration time
   const expirationTime = new Date();
   expirationTime.setMinutes(expirationTime.getMinutes() + 30);
-  
+
   user.tokens = user.tokens.concat({ token, expiresAt: expirationTime });
   await user.save();
-  
+
   return token;
 };
 
 // Method to remove expired tokens
-userSchema.methods.removeExpiredTokens = async function() {
+userSchema.methods.removeExpiredTokens = async function () {
   const user = this;
   const currentTime = new Date();
-  
+
   user.tokens = user.tokens.filter(tokenObj => tokenObj.expiresAt > currentTime);
   await user.save();
 };
@@ -107,16 +96,16 @@ userSchema.statics.findByCredentials = async (email, password) => {
   if (!user) {
     throw new Error('Unable to login');
   }
-  
+
   // Compare provided password with stored hashed password
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
     throw new Error('Unable to login');
   }
-  
+
   // Remove expired tokens before returning the user
   await user.removeExpiredTokens();
-  
+
   return user;
 };
 
@@ -130,6 +119,13 @@ userSchema.pre('save', async function (next) {
 
   next();
 });
+
+// Custom validation for categories
+userSchema.path('categories').validate(function (categories) {
+  const categoryNames = categories.map(cat => cat.name.toLowerCase());
+  const uniqueNames = new Set(categoryNames);
+  return categoryNames.length === uniqueNames.size;
+}, 'Duplicate category names are not allowed for the same user');
 
 // Create the User model
 const User = mongoose.model('User', userSchema);

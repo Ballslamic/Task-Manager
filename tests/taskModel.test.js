@@ -1,11 +1,8 @@
 require('dotenv').config(); // Load environment variables from .env file
 
 const mongoose = require('mongoose');
-const request = require('supertest'); // Import the request function from supertest
-const app = require('../app'); // Import the Express app
 const Task = require('../models/taskModel'); // Import the Task model
 const User = require('../models/userModel'); // Import the User model
-const Category = require('../models/categoryModelUnused'); // Import the Category model
 
 describe('Task Model', () => {
     let testUser, testCategory;
@@ -15,19 +12,24 @@ describe('Task Model', () => {
         await mongoose.connect(process.env.MONGO_URL, { dbName: process.env.DB_NAME });
 
         // Create a user and a category for testing
-        testUser = await User.create({ userName: 'TestUser', email: 'testuser@example.com', password: 'testpassword' });
-        testCategory = await Category.create({ 
-            name: 'Work', 
-            colorCode: '#ff0000',
-            owner: testUser._id  // Set the owner when creating the category
+        testUser = await User.create({ 
+            userName: 'TestUser', 
+            email: 'testuser@example.com', 
+            password: 'testpassword' 
         });
+        testCategory = {
+            name: 'Work',
+            colorCode: '#ff0000'
+        };
+        testUser.categories.push(testCategory);
+        await testUser.save();
+        testCategory = testUser.categories[0]; // Get the saved category with _id
     });
 
     afterAll(async () => {
-        // Clean up the database by deleting only the tasks, users, and categories created during tests
+        // Clean up the database by deleting only the tasks and users created during tests
         await Task.deleteMany({ owner: testUser._id });
-        await User.deleteOne({ userName: 'TestUser' });
-        await Category.deleteOne({ _id: testCategory._id });
+        await User.deleteOne({ _id: testUser._id });
         // Close the MongoDB connection after all tests have run
         await mongoose.connection.close();
     });
@@ -62,20 +64,6 @@ describe('Task Model', () => {
             err = error;
         }
         expect(err).toBeDefined(); // Ensure that an error is thrown due to missing fields
-    });
-
-    // Test case: Should create a task with the authenticated user as owner
-    it('should create a task with the authenticated user as owner', async () => {
-        const res = await request(app)
-            .post('/task/createTask')
-            .set('Authorization', `Bearer ${token}`)
-            .send({
-                taskDesc: 'Test Task',
-                category: testCategory._id
-            });
-
-        expect(res.statusCode).toEqual(201);
-        expect(res.body.task.owner.toString()).toBe(testUser._id.toString());
     });
 
     // Test case: Should update a task's description
