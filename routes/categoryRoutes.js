@@ -12,16 +12,16 @@ router.post("/categories/add", auth, async (req, res) => {
     // Check if the category name already exists for this user
     const categoryExists = user.categories.some(cat => cat.name === categoryName);
     if (categoryExists) {
-      return res.status(400).send({ error: 'Category name already exists' });
+      return res.status(400).json({ error: 'Category name already exists' });
     }
 
     // Add the new category to the user's categories array
     user.categories.push({ name: categoryName, colorCode });
     await user.save();
 
-    res.status(201).send({ category: user.categories[user.categories.length - 1] });
+    res.status(201).json({ category: user.categories[user.categories.length - 1] });
   } catch (error) {
-    res.status(400).send({ error: error.message });
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -29,9 +29,9 @@ router.post("/categories/add", auth, async (req, res) => {
 router.get("/categories", auth, async (req, res) => {
   try {
     const user = req.user;
-    res.send({ categories: user.categories });
+    res.status(200).json({ categories: user.categories });
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -45,7 +45,7 @@ router.put("/categories/edit/:id", auth, async (req, res) => {
     // Find the category in the user's categories array
     const categoryIndex = user.categories.findIndex(cat => cat._id.toString() === categoryId);
     if (categoryIndex === -1) {
-      return res.status(404).send({ error: 'Category not found' });
+      return res.status(404).json({ error: 'Category not found' });
     }
 
     // Update the category
@@ -53,9 +53,9 @@ router.put("/categories/edit/:id", auth, async (req, res) => {
     user.categories[categoryIndex].colorCode = colorCode;
     await user.save();
 
-    res.send({ category: user.categories[categoryIndex] });
+    res.status(200).json({ category: user.categories[categoryIndex] });
   } catch (error) {
-    res.status(400).send({ error: error.message });
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -69,9 +69,9 @@ router.delete("/categories/delete/:id", auth, async (req, res) => {
     user.categories = user.categories.filter(cat => cat._id.toString() !== categoryId);
     await user.save();
 
-    res.send({ message: 'Category deleted successfully' });
+    res.status(200).json({ message: 'Category deleted successfully' });
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 

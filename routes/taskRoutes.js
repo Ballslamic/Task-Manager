@@ -32,12 +32,17 @@ router.put('/updateTask/:id', auth, async (req, res) => {
             return res.status(404).json({ error: 'Task not found' });
         }
 
+        // Check if the user owns the task
+        if (task.owner.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Not authorized to update this task' });
+        }
+
         const updates = Object.keys(req.body);
         const allowedUpdates = ["taskDesc", "completed", "startDate", "endDate", "startTime", "endTime", "category", "recurrence"];
         const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
 
         if (!isValidOperation) {
-            return res.status(400).send({ message: "Invalid updates!" });
+            return res.status(400).json({ error: "Invalid updates!" });
         }
 
         updates.forEach(update => task[update] = req.body[update]);
@@ -53,23 +58,24 @@ router.put('/updateTask/:id', auth, async (req, res) => {
 // Delete a task
 router.delete('/deleteTask/:id', auth, async (req, res) => {
     try {
-        const task = await Task.findByIdAndDelete(req.params.id);
+        const task = await Task.findOneAndDelete({ _id: req.params.id, owner: req.user._id });
         if (!task) {
             return res.status(404).json({ error: 'Task not found' });
         }
-        res.status(200).json({ task, message: 'Task deleted successfully' });
+        res.status(200).json({ message: 'Task deleted successfully' });
     } catch (error) {
         console.error("Error deleting task:", error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-// Get tasks (example route)
+// Get all tasks for the authenticated user
 router.get('/getTasks', auth, async (req, res) => {
     try {
         const tasks = await Task.find({ owner: req.user._id });
         res.status(200).json({ tasks });
     } catch (error) {
+        console.error("Error fetching tasks:", error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });

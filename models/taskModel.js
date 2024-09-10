@@ -1,63 +1,44 @@
 const mongoose = require("mongoose");
 
-// Define a schema for recurrence rules
-const recurrenceRuleSchema = new mongoose.Schema({
-    frequency: {
-        type: String,
-        enum: ['daily', 'weekly', 'monthly', 'yearly'],
-        required: true
-    },
-    daysOfWeek: [{
-        type: String,
-        enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    }],
-    interval: {
-        type: Number,
-        default: 1
-    },
-    endDate: Date
-});
-
-// Define a schema for excluded dates
-const excludedDateSchema = new mongoose.Schema({
-    date: {
-        type: Date,
-        required: true
-    },
-    reason: String
-});
-
-// Modify the task schema
+// Define the schema for tasks
 const taskSchema = new mongoose.Schema({
     taskDesc: {
         type: String,
         required: true,
-        trim: true
+        trim: true // Removes whitespace from both ends of the string
     },
     completed: {
         type: Boolean,
-        default: false
+        default: false // Tasks are not completed by default
     },
     owner: {
         type: mongoose.Schema.Types.ObjectId,
         required: true,
-        ref: 'User'
+        ref: 'User' // References the User model
     },
     category: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Category'
+        ref: 'Category' // References the Category model
     },
     startDate: {
-        type: Date,
-        required: true
+        type: Date
     },
-    endDate: Date,
-    startTime: String,
-    endTime: String,
-    recurrenceRule: recurrenceRuleSchema,
-    excludedDates: [excludedDateSchema]
+    endDate: {
+        type: Date
+    },
+    startTime: {
+        type: String // Stored as a string, e.g., "14:30"
+    },
+    endTime: {
+        type: String // Stored as a string, e.g., "16:00"
+    },
+    recurrence: {
+        type: String,
+        enum: ['daily', 'weekly', 'monthly', 'yearly', 'none'],
+        default: 'none'
+    }
 }, {
-    timestamps: true
+    timestamps: true // Automatically add createdAt and updatedAt fields
 });
 
 // Create a compound index for efficient querying
@@ -66,7 +47,10 @@ taskSchema.index({ owner: 1, completed: 1 });
 // Define a pre-save middleware
 taskSchema.pre('save', async function(next) {
     const task = this;
-    // Custom logic can be added here
+    // Custom logic can be added here, for example:
+    // - Validate date ranges
+    // - Set default values
+    // - Perform any necessary data transformations
 
     next();
 });
@@ -76,12 +60,14 @@ taskSchema.methods.toJSON = function() {
     const task = this;
     const taskObject = task.toObject();
 
-    // Add custom formatting here
+    // Add any custom formatting here, for example:
+    // - Convert dates to a specific format
+    // - Add calculated fields
 
     return taskObject;
 };
 
 // Create the Task model from the schema
-const Task = mongoose.model("Task", taskSchema);
+const Task = mongoose.model('Task', taskSchema);
 
 module.exports = Task; // Export the model for use in other files

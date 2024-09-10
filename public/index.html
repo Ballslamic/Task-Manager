@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Task Manager</h1>
+    </header>
+    <main>
+        <section id="task-list">
+            <h2>Your Tasks</h2>
+            <ul id="tasks"></ul>
+        </section>
+        <section id="add-task">
+            <h2>Add New Task</h2>
+            <form id="new-task-form">
+                <input type="text" id="task-desc" placeholder="Task description" required>
+                <select id="task-category">
+                    <!-- Categories will be populated dynamically -->
+                </select>
+                <button type="submit">Add Task</button>
+            </form>
+        </section>
+    </main>
+    <script src="js/renderer.js"></script>
+</body>
+</html>

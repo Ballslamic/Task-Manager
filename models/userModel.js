@@ -101,10 +101,9 @@ userSchema.methods.removeExpiredTokens = async function() {
   await user.save();
 };
 
-// Modified: Custom static method to find user by credentials
-userSchema.statics.findByCredentials = async (userName, password) => {
-  // Find the user by username
-  const user = await User.findOne({ userName });
+// Static method to find user by credentials
+userSchema.statics.findByCredentials = async (email, password) => {
+  const user = await User.findOne({ email });
   if (!user) {
     throw new Error('Unable to login');
   }
@@ -133,5 +132,6 @@ userSchema.pre('save', async function (next) {
 });
 
 // Create the User model
-const User = mongoose.model("User", userSchema);
+const User = mongoose.model('User', userSchema);
+
 module.exports = User; // Export user model for use in other files
