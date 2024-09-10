@@ -9,14 +9,14 @@ const auth = async (req, res, next) => {
     const user = await User.findOne({ _id: decoded._id, 'tokens.token': token });
 
     if (!user) {
-      throw new Error('User not found');
+      throw new Error();
     }
 
     // Remove expired tokens
     await user.removeExpiredTokens();
 
     // Check if the current token is still in the user's tokens array after removal
-    const tokenStillValid = user.tokens.some(tokenObj => tokenObj.token === token);
+    const tokenStillValid = user.tokens.some(t => t.token === token);
     if (!tokenStillValid) {
       throw new Error('Token has expired');
     }
@@ -25,7 +25,12 @@ const auth = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    res.status(401).send({ error: 'Please authenticate.' });
+    res.status(401);
+    if (res.json) {
+      res.json({ error: 'Please authenticate.' });
+    } else {
+      res.send({ error: 'Please authenticate.' });
+    }
   }
 };
 
