@@ -127,10 +127,11 @@ router.patch("/me", auth, async (req, res) => {
 // Delete user account
 router.delete("/me", auth, async (req, res) => {
   try {
-    await req.user.remove();
-    res.send(req.user);
+    await User.deleteOne({ _id: req.user._id });
+    res.send({ message: 'User deleted successfully' });
   } catch (error) {
-    res.status(500).send();
+    console.error('Error deleting user:', error);
+    res.status(500).send({ error: 'Internal Server Error', details: error.message });
   }
 });
 

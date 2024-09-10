@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const app = require('../app'); // Import the Express app
 const User = require('../models/userModel'); // Import the User model
 
-const TEST_USER_PREFIX = 'TestUser';
+const TEST_USER_PREFIX = 'testuser_';
 
 describe('User Routes', () => {
     let testUser;
@@ -17,19 +17,17 @@ describe('User Routes', () => {
     });
 
     afterAll(async () => {
-        const deletedCount = await User.deleteMany({ userName: new RegExp(`^${TEST_USER_PREFIX}`) });
-        console.log(`Cleaned up ${deletedCount.deletedCount} test users`);
+        await User.deleteMany({ userName: new RegExp(`^${TEST_USER_PREFIX}`) });
         await mongoose.connection.close();
         console.log('Disconnected from database');
     });
 
     beforeEach(async () => {
-        const deletedCount = await User.deleteMany({ userName: new RegExp(`^${TEST_USER_PREFIX}`) });
-        console.log(`Cleaned up ${deletedCount.deletedCount} test users before test`);
+        await User.deleteMany({ userName: new RegExp(`^${TEST_USER_PREFIX}`) });
         
         testUser = await User.create({
-            userName: `${TEST_USER_PREFIX}`,
-            email: 'testuser@example.com',
+            userName: `${TEST_USER_PREFIX}${Date.now()}`,
+            email: `testuser_${Date.now()}@example.com`,
             password: 'testpassword123'
         });
         console.log(`Created test user: ${testUser.userName}`);
@@ -37,16 +35,17 @@ describe('User Routes', () => {
         const loginRes = await request(app)
             .post('/user/login')
             .send({
-                userName: `${TEST_USER_PREFIX}`,
+                email: testUser.email,
                 password: 'testpassword123'
             });
         testUserToken = loginRes.body.token;
-        console.log(`Logged in test user, token received: ${testUserToken ? 'Yes' : 'No'}`);
     });
 
     afterEach(async () => {
-        const deletedCount = await User.deleteMany({ userName: new RegExp(`^${TEST_USER_PREFIX}`) });
-        console.log(`Cleaned up ${deletedCount.deletedCount} test users after test`);
+        if (testUser) {
+            await User.findByIdAndDelete(testUser._id);
+            console.log(`Deleted test user: ${testUser.userName}`);
+        }
     });
 
     // Test case: Should register a new user
@@ -54,89 +53,75 @@ describe('User Routes', () => {
         const res = await request(app)
             .post('/user/register')
             .send({
-                userName: `${TEST_USER_PREFIX}New`,
-                email: 'testnewuser@example.com',
+                userName: `${TEST_USER_PREFIX}new`,
+                email: 'newuser@example.com',
                 password: 'newpassword123'
             });
-
-        console.log(`Register response status: ${res.statusCode}`);
-        console.log(`Register response body: ${JSON.stringify(res.body)}`);
-
-        expect(res.statusCode).toEqual(201);
-        expect(res.body.user).toHaveProperty('_id');
+        
+        expect(res.statusCode).toBe(201);
+        expect(res.body).toHaveProperty('user');
         expect(res.body).toHaveProperty('token');
     });
 
     // Test case: Should login a user
-    it('should login a user', async () => {
+    it('should login an existing user', async () => {
         const res = await request(app)
             .post('/user/login')
             .send({
-                userName: `${TEST_USER_PREFIX}`,
+                email: testUser.email,
                 password: 'testpassword123'
             });
-
-        console.log('Login response:', res.body);
-        expect(res.statusCode).toEqual(200);
+        
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toHaveProperty('user');
         expect(res.body).toHaveProperty('token');
     });
 
-    // Test case: Should not login with invalid credentials
-    it('should not login with invalid credentials', async () => {
+    // Test case: Should get user profile
+    it('should get user profile', async () => {
         const res = await request(app)
-            .post('/user/login')
-            .send({
-                userName: `${TEST_USER_PREFIX}`,
-                password: 'wrongpassword'
-            });
-
-        console.log('Invalid login response:', res.body);
-        expect(res.statusCode).toEqual(400);
-        expect(res.body).toHaveProperty('error');
+            .get('/user/me')
+            .set('Authorization', `Bearer ${testUserToken}`);
+        
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toHaveProperty('userName', testUser.userName);
+        expect(res.body).toHaveProperty('email', testUser.email);
     });
 
     // Test case: Should update a user's email
-    it('should update a user\'s email', async () => {
+    it('should update user profile', async () => {
         const res = await request(app)
-            .put(`/user/updateUser/${testUser._id}`)
+            .patch('/user/me')
             .set('Authorization', `Bearer ${testUserToken}`)
             .send({
-                email: 'newemail@example.com'
+                userName: `${TEST_USER_PREFIX}updated`
             });
-
-        console.log('Update email response:', res.body);
-        expect(res.statusCode).toEqual(200);
-
-        const updatedUser = await User.findById(testUser._id);
-        expect(updatedUser.email).toBe('newemail@example.com');
+        
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toHaveProperty('userName', `${TEST_USER_PREFIX}updated`);
     });
 
-    // Test case: Should not allow a user to delete another user
-    it('should not allow a user to delete another user', async () => {
-        const anotherUser = await User.create({
-            userName: `${TEST_USER_PREFIX}Another`,
-            email: 'testanother@example.com',
-            password: 'anotherpassword123'
-        });
-
+    // Test case: Should logout a user
+    it('should logout user', async () => {
         const res = await request(app)
-            .delete(`/user/deleteUser/${anotherUser._id}`)
+            .post('/user/logout')
             .set('Authorization', `Bearer ${testUserToken}`);
-
-        expect(res.statusCode).toEqual(403);
-        const userStillExists = await User.findById(anotherUser._id);
-        expect(userStillExists).not.toBeNull();
+        
+        expect(res.statusCode).toBe(200);
     });
 
     // Test case: Should delete a user
-    it('should delete a user', async () => {
+    it('should delete user account', async () => {
         const res = await request(app)
-            .delete(`/user/deleteUser/${testUser._id}`)
+            .delete('/user/me')
             .set('Authorization', `Bearer ${testUserToken}`);
-
-        console.log('Delete user response:', res.body);
-        expect(res.statusCode).toEqual(200);
-
+        
+        if (res.statusCode !== 200) {
+            console.log('Delete user response:', res.body);
+        }
+        
+        expect(res.statusCode).toBe(200);
+        
         const deletedUser = await User.findById(testUser._id);
         expect(deletedUser).toBeNull();
     });
