@@ -23,8 +23,8 @@ app.use(express.json()); // Parse JSON request bodies
 
 // Routes
 app.use('/user', userRoutes);
-app.use('/tasks', taskRoutes);
-app.use('/categories', categoryRoutes);
+app.use('/task', taskRoutes);
+app.use('/category', categoryRoutes);
 
 // Root route
 app.get('/', (req, res) => {

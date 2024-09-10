@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middlewares/auth'); // Ensure auth middleware is required
 const Task = require('../models/taskModel');
-const User = require('../models/userModel');
 
 // Create a new task
 router.post('/createTask', auth, async (req, res) => {

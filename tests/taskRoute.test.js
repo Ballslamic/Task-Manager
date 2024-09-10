@@ -3,9 +3,10 @@ require('dotenv').config(); // Load environment variables from .env file
 const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../app'); // Import the Express app
-const Task = require('../models/taskModel'); // Import the Task model
 const User = require('../models/userModel'); // Import the User model
-const Category = require('../models/categoryModelUnused'); // Import the Category model
+const Task = require('../models/taskModel'); // Import the Task model
+
+const TEST_USER_PREFIX = 'testuser_';
 
 describe('Task Routes', () => {
     let testUser, testCategory, token;
@@ -13,28 +14,33 @@ describe('Task Routes', () => {
     beforeAll(async () => {
         // Connect to the MongoDB database before running the tests
         await mongoose.connect(process.env.MONGO_URL, { dbName: process.env.DB_NAME });
+        console.log('Connected to database');
 
         // Register and log in a user to obtain a token for authenticated requests
-        testUser = await User.create({ userName: 'TestUser', email: 'testuser@example.com', password: 'testpassword' });
+        testUser = new User({
+            userName: `${TEST_USER_PREFIX}${Date.now()}`,
+            email: `testuser_${Date.now()}@example.com`,
+            password: 'testpassword123'
+        });
+        testUser.categories.push({ name: 'TestCategory', colorCode: '#FF0000' });
+        await testUser.save();
+
         const loginRes = await request(app)
             .post('/user/login')
-            .send({ email: 'testuser@example.com', password: 'testpassword' });
+            .send({ email: testUser.email, password: 'testpassword123' });
         token = loginRes.body.token;
-        
-        testCategory = await Category.create({ 
-            name: 'TestCategory', 
-            colorCode: '#FF0000', 
-            owner: testUser._id 
-        });
+        testCategory = testUser.categories[0];
+
+        console.log('Test user created:', testUser.userName);
+        console.log('Test category created:', testCategory.name);
     });
 
     afterAll(async () => {
         // Clean up the database by deleting only the tasks, users, and categories created during tests
         await Task.deleteMany({ owner: testUser._id });
-        await User.deleteOne({ userName: 'TestUser' });
-        await Category.deleteOne({ _id: testCategory._id });
-        // Close the MongoDB connection after all tests have run
+        await User.deleteOne({ _id: testUser._id });
         await mongoose.connection.close();
+        console.log('Disconnected from database');
     });
 
     afterEach(async () => {
@@ -44,13 +50,17 @@ describe('Task Routes', () => {
 
     // Test case: Should create a new task
     it('should create a new task', async () => {
+        console.log('Token:', token);
         const res = await request(app)
             .post('/task/createTask')
-            .set('Authorization', `Bearer ${token}`) // Set the Authorization header with the token
+            .set('Authorization', `Bearer ${token}`)
             .send({
                 taskDesc: 'Test Task',
                 category: testCategory._id
             });
+
+        console.log('Response:', res.body);
+        console.log('Status:', res.status);
 
         expect(res.statusCode).toEqual(201); // Expect status code 201 for successful creation
         expect(res.body.task).toHaveProperty('_id'); // Ensure the task has an ID
@@ -77,21 +87,22 @@ describe('Task Routes', () => {
 
     // Test case: Should update a task's description
     it('should update a task\'s description', async () => {
-        console.log(token); // Log the token for debugging
         const task = await Task.create({
             taskDesc: 'Initial Task Description',
             owner: testUser._id,
             category: testCategory._id
         });
 
+        console.log('Token:', token);
         const res = await request(app)
             .put(`/task/updateTask/${task._id}`)
-            .set('Authorization', `Bearer ${token}`) // Set the Authorization header with the token
+            .set('Authorization', `Bearer ${token}`)
             .send({
                 taskDesc: 'Updated Task Description',
             });
 
-        console.log("Response:", res.body); // Log the response for debugging
+        console.log('Response:', res.body);
+        console.log('Status:', res.status);
 
         expect(res.statusCode).toEqual(200); // Expect status code 200 for successful update
         expect(res.body.task.taskDesc).toBe('Updated Task Description'); // Ensure the task description is updated
@@ -99,18 +110,19 @@ describe('Task Routes', () => {
 
     // Test case: Should delete a task
     it('should delete a task', async () => {
-        console.log(token); // Log the token for debugging
         const task = await Task.create({
             taskDesc: 'Delete Me',
             owner: testUser._id,
             category: testCategory._id
         });
 
+        console.log('Token:', token);
         const res = await request(app)
             .delete(`/task/deleteTask/${task._id}`)
-            .set('Authorization', `Bearer ${token}`); // Set the Authorization header with the token
+            .set('Authorization', `Bearer ${token}`);
 
-        console.log("Response:", res.body); // Log the response for debugging
+        console.log('Response:', res.body);
+        console.log('Status:', res.status);
 
         expect(res.statusCode).toEqual(200); // Expect status code 200 for successful deletion
 
@@ -120,12 +132,13 @@ describe('Task Routes', () => {
 
     // Test case: Should not get tasks with an invalid token
     it('should not get tasks with an invalid token', async () => {
-        console.log(token); // Log the token for debugging
+        console.log('Invalid Token: invalidtoken');
         const res = await request(app)
             .get('/task/getTasks')
-            .set('Authorization', 'Bearer invalidtoken'); // Set an invalid Authorization header
+            .set('Authorization', 'Bearer invalidtoken');
 
-        console.log("Response: ", res.body); // Log the response for debugging
+        console.log('Response:', res.body);
+        console.log('Status:', res.status);
 
         expect(res.statusCode).toEqual(401); // Expect status code 401 for unauthorized access
     });
