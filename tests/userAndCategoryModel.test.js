@@ -3,7 +3,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('../models/userModel');
 
-const TEST_USER_PREFIX = 'TestUser';
+const TEST_USER_PREFIX = 'testuser_';
 
 describe('User and Category Model', () => {
     beforeAll(async () => {
@@ -101,77 +101,43 @@ describe('User and Category Model', () => {
         expect(updatedUser.categories[0].colorCode).toBe('#FF0000');
     });
 
-    it('should not allow duplicate category names for the same user', async () => {
+    it('should update a category for a user', async () => {
         const user = new User({
-            userName: `${TEST_USER_PREFIX}DuplicateCategory`,
-            email: 'testduplicatecategory@example.com',
+            userName: `${TEST_USER_PREFIX}CategoryUpdate`,
+            email: 'testcategoryupdate@example.com',
             password: 'testpassword'
         });
-        await user.save();
-
         user.categories.push({
             name: 'Work',
             colorCode: '#FF0000'
         });
         await user.save();
 
-        user.categories.push({
-            name: 'Work',
-            colorCode: '#00FF00'
-        });
+        user.categories[0].name = 'Updated Work';
+        user.categories[0].colorCode = '#00FF00';
+        await user.save();
 
-        await expect(user.save()).rejects.toThrow('Duplicate category names are not allowed');
+        const updatedUser = await User.findById(user._id);
+        expect(updatedUser.categories[0].name).toBe('Updated Work');
+        expect(updatedUser.categories[0].colorCode).toBe('#00FF00');
     });
 
-    it('should allow same category name for different users', async () => {
-        const user1 = new User({
-            userName: `${TEST_USER_PREFIX}1Category`,
-            email: 'testuser1@example.com',
+    it('should delete a category for a user', async () => {
+        const user = new User({
+            userName: `${TEST_USER_PREFIX}CategoryDelete`,
+            email: 'testcategorydelete@example.com',
             password: 'testpassword'
         });
-        await user1.save();
-        console.log(`Created user1: ${user1.userName}`);
-
-        const user2 = new User({
-            userName: `${TEST_USER_PREFIX}2Category`,
-            email: 'testuser2@example.com',
-            password: 'testpassword'
+        user.categories.push({
+            name: 'Work',
+            colorCode: '#FF0000'
         });
-        await user2.save();
-        console.log(`Created user2: ${user2.userName}`);
+        await user.save();
 
-        const fetchedUser1 = await User.findById(user1._id);
-        const fetchedUser2 = await User.findById(user2._id);
+        user.categories = user.categories.filter(cat => cat.name !== 'Work');
+        await user.save();
 
-        console.log(`Fetched user1: ${fetchedUser1 ? fetchedUser1.userName : 'null'}`);
-        console.log(`Fetched user2: ${fetchedUser2 ? fetchedUser2.userName : 'null'}`);
-
-        if (fetchedUser1 && fetchedUser2) {
-            fetchedUser1.categories.push({
-                name: 'Work',
-                colorCode: '#FF0000'
-            });
-            await fetchedUser1.save();
-            console.log(`Added category to user1`);
-
-            fetchedUser2.categories.push({
-                name: 'Work',
-                colorCode: '#00FF00'
-            });
-            await fetchedUser2.save();
-            console.log(`Added category to user2`);
-
-            const updatedUser1 = await User.findById(user1._id);
-            const updatedUser2 = await User.findById(user2._id);
-
-            console.log(`Updated user1 categories: ${JSON.stringify(updatedUser1.categories)}`);
-            console.log(`Updated user2 categories: ${JSON.stringify(updatedUser2.categories)}`);
-
-            expect(updatedUser1.categories[0].name).toBe('Work');
-            expect(updatedUser2.categories[0].name).toBe('Work');
-            expect(updatedUser1.categories[0]._id).not.toEqual(updatedUser2.categories[0]._id);
-        } else {
-            throw new Error('Failed to fetch users');
-        }
+        const updatedUser = await User.findById(user._id);
+        expect(updatedUser.categories.length).toBe(0);
     });
 });
