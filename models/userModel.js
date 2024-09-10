@@ -27,7 +27,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true, // Ensures the email is unique
-    lowercase: true, // Converts email to lowercase before saving \post-tests
+    lowercase: true, // Converts email to lowercase before saving
     trim: true, // Removes any surrounding spaces
   },
   password: {
@@ -39,6 +39,7 @@ const userSchema = new mongoose.Schema({
   categories: {
     type: [categorySchema],
     validate: {
+      // Custom validator to ensure category names are unique for a user
       validator: function(categories) {
         const categoryNames = categories.map(cat => cat.name);
         const uniqueNames = new Set(categoryNames);
@@ -51,6 +52,10 @@ const userSchema = new mongoose.Schema({
     token: {
       type: String,
       required: true
+    },
+    expiresAt: {
+      type: Date,
+      required: true
     }
   }]
 });
@@ -59,30 +64,60 @@ const userSchema = new mongoose.Schema({
 userSchema.methods.toJSON = function() {
   const user = this;
   const userObject = user.toObject();
+  
+  // Remove sensitive information before sending user data
   delete userObject.password;
   delete userObject.tokens;
+  
   return userObject;
 };
 
-// Custom method to generate authentication token
+// Custom method to generate authentication token with expiration
 userSchema.methods.generateAuthToken = async function() {
   const user = this;
-  const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET);
-  user.tokens = user.tokens.concat({ token });
+  // Create a new JWT token with 30 minutes expiration
+  const token = jwt.sign(
+    { _id: user._id.toString() },
+    process.env.JWT_SECRET,
+    { expiresIn: '30m' }
+  );
+  
+  // Add the token to the user's tokens array with expiration time
+  const expirationTime = new Date();
+  expirationTime.setMinutes(expirationTime.getMinutes() + 30);
+  
+  user.tokens = user.tokens.concat({ token, expiresAt: expirationTime });
   await user.save();
+  
   return token;
 };
 
-// Custom static method to find user by credentials
+// Method to remove expired tokens
+userSchema.methods.removeExpiredTokens = async function() {
+  const user = this;
+  const currentTime = new Date();
+  
+  user.tokens = user.tokens.filter(tokenObj => tokenObj.expiresAt > currentTime);
+  await user.save();
+};
+
+// Modified: Custom static method to find user by credentials
 userSchema.statics.findByCredentials = async (userName, password) => {
+  // Find the user by username
   const user = await User.findOne({ userName });
   if (!user) {
     throw new Error('Unable to login');
   }
+  
+  // Compare provided password with stored hashed password
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
     throw new Error('Unable to login');
   }
+  
+  // Remove expired tokens before returning the user
+  await user.removeExpiredTokens();
+  
   return user;
 };
 

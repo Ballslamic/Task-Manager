@@ -5,27 +5,26 @@ require('dotenv').config(); // Load environment variables from .env file
 const auth = async (req, res, next) => {
   try {
     const token = req.header('Authorization').replace('Bearer ', '');
-    // console.log('Received token:', token);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    // console.log('Decoded token:', decoded);
-    const user = await User.findOne({ _id: decoded._id });
+    const user = await User.findOne({ _id: decoded._id, 'tokens.token': token });
 
     if (!user) {
       throw new Error('User not found');
     }
 
-    // Check if the token already exists in the user's tokens array
-    const tokenExists = user.tokens.some(t => t.token === token);
-    if (!tokenExists) {
-      user.tokens = user.tokens.concat({ token });
-      await user.save();
+    // Remove expired tokens
+    await user.removeExpiredTokens();
+
+    // Check if the current token is still in the user's tokens array after removal
+    const tokenStillValid = user.tokens.some(tokenObj => tokenObj.token === token);
+    if (!tokenStillValid) {
+      throw new Error('Token has expired');
     }
 
     req.token = token;
     req.user = user;
     next();
   } catch (error) {
-    // console.log('Auth error:', error.message);
     res.status(401).send({ error: 'Please authenticate.' });
   }
 };
