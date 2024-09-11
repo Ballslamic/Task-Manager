@@ -1,8 +1,12 @@
 const mongoose = require("mongoose");
+const validator = require('validator');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-// Define the schema for categories
+/**
+ * Category Schema
+ * Defines the structure for category documents embedded in user documents.
+ */
 const categorySchema = new mongoose.Schema({
   name: {
     type: String,
@@ -11,30 +15,65 @@ const categorySchema = new mongoose.Schema({
   },
   colorCode: {
     type: String,
-    required: true
+    required: true,
+    validate: {
+      validator: function(v) {
+        return /^#[0-9A-Fa-f]{6}$/.test(v);
+      },
+      message: props => `${props.value} is not a valid color code. Use hexadecimal format (e.g., #FF0000).`
+    }
   }
 });
 
-// Define the schema for users
+/**
+ * User Schema
+ * Defines the structure for user documents in the database.
+ */
 const userSchema = new mongoose.Schema({
   userName: {
     type: String,
     required: true,
-    unique: true, // Ensures the username is unique
-    trim: true, // Removes any surrounding spaces
+    unique: true,
+    trim: true,
+    minlength: 3,
+    maxlength: 30,
+    validate: {
+      validator: function(v) {
+        return /^[a-zA-Z0-9_]+$/.test(v);
+      },
+      message: props => `${props.value} is not a valid username. Use only alphanumeric characters and underscores.`
+    }
   },
   email: {
     type: String,
     required: true,
-    unique: true, // Ensures the email is unique
-    lowercase: true, // Converts email to lowercase before saving
-    trim: true, // Removes any surrounding spaces
+    unique: true,
+    trim: true,
+    lowercase: true,
+    validate: {
+      validator: function(v) {
+        if (!validator.isEmail(v)) {
+          throw new Error('Email is invalid');
+        }
+      },
+      message: props => `${props.value} is not a valid email address.`
+    }
   },
   password: {
     type: String,
     required: true,
-    minlength: 7, // Minimum password length
-    trim: true, // Removes any surrounding spaces
+    minlength: 8,
+    trim: true,
+    validate: {
+      validator: function(v) {
+        // Only validate if the password is being modified
+        if (this.isModified('password')) {
+          return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(v);
+        }
+        return true;
+      },
+      message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.'
+    }
   },
   categories: [categorySchema],
   tokens: [{
@@ -49,7 +88,11 @@ const userSchema = new mongoose.Schema({
   }]
 });
 
-// Custom method to convert user object to JSON
+/**
+ * toJSON method
+ * Customizes the JSON representation of the user document.
+ * @returns {Object} The formatted user object without sensitive information
+ */
 userSchema.methods.toJSON = function () {
   const user = this;
   const userObject = user.toObject();
@@ -61,27 +104,26 @@ userSchema.methods.toJSON = function () {
   return userObject;
 };
 
-// Custom method to generate authentication token with expiration
-userSchema.methods.generateAuthToken = async function () {
+/**
+ * generateAuthToken method
+ * Generates a new authentication token for the user.
+ * @returns {string} The generated authentication token
+ */
+userSchema.methods.generateAuthToken = async function() {
   const user = this;
-  // Create a new JWT token with 30 minutes expiration
-  const token = jwt.sign(
-    { _id: user._id.toString() },
-    process.env.JWT_SECRET,
-    { expiresIn: '30m' }
-  );
+  const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET);
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // Token expires in 24 hours
 
-  // Add the token to the user's tokens array with expiration time
-  const expirationTime = new Date();
-  expirationTime.setMinutes(expirationTime.getMinutes() + 30);
-
-  user.tokens = user.tokens.concat({ token, expiresAt: expirationTime });
+  user.tokens = user.tokens.concat({ token, expiresAt });
   await user.save();
 
   return token;
 };
 
-// Method to remove expired tokens
+/**
+ * removeExpiredTokens method
+ * Removes expired tokens from the user's tokens array.
+ */
 userSchema.methods.removeExpiredTokens = async function () {
   const user = this;
   const currentTime = new Date();
@@ -90,7 +132,14 @@ userSchema.methods.removeExpiredTokens = async function () {
   await user.save();
 };
 
-// Static method to find user by credentials
+/**
+ * findByCredentials static method
+ * Finds a user by email and password for authentication.
+ * @param {string} email - The user's email address
+ * @param {string} password - The user's password
+ * @returns {Object} The authenticated user object
+ * @throws {Error} If login fails
+ */
 userSchema.statics.findByCredentials = async (email, password) => {
   const user = await User.findOne({ email });
   if (!user) {
@@ -109,7 +158,10 @@ userSchema.statics.findByCredentials = async (email, password) => {
   return user;
 };
 
-// Hash the password before saving to the database
+/**
+ * Pre-save middleware
+ * Hashes the password before saving to the database.
+ */
 userSchema.pre('save', async function (next) {
   const user = this;
 
@@ -120,7 +172,10 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-// Custom validation for categories
+/**
+ * Custom validation for categories
+ * Ensures that category names are unique for each user.
+ */
 userSchema.path('categories').validate(function (categories) {
   const categoryNames = categories.map(cat => cat.name.toLowerCase());
   const uniqueNames = new Set(categoryNames);

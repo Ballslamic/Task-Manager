@@ -1,15 +1,28 @@
 const express = require("express");
+const { sanitizeInput, sanitizeParam } = require("../middlewares/sanitize");
 const User = require("../models/userModel");
 const auth = require("../middlewares/auth");
 const router = express.Router();
 
-// Tests user route to make sure it is working
+/**
+ * @route GET /user
+ * @description Test route to check if user routes are working
+ * @access Public
+ */
 router.get("/", (req, res) => {
   res.send("User route is working");
 });
 
-// Register a new user
-router.post("/register", async (req, res) => {
+/**
+ * @route POST /user/register
+ * @description Register a new user
+ * @access Public
+ */
+router.post("/register", [
+  sanitizeInput("userName"),
+  sanitizeInput("email"),
+  sanitizeInput("password")
+], async (req, res) => {
   try {
     const user = new User(req.body);
     await user.save();
@@ -20,8 +33,15 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// login as a user
-router.post("/login", async (req, res) => {
+/**
+ * @route POST /user/login
+ * @description Login as a user
+ * @access Public
+ */
+router.post("/login", [
+  sanitizeInput("email"),
+  sanitizeInput("password")
+], async (req, res) => {
   try {
     const user = await User.findByCredentials(req.body.email, req.body.password);
     const token = await user.generateAuthToken();
@@ -31,8 +51,18 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Update user's email
-router.put("/updateUser/:id", auth, async (req, res) => {
+/**
+ * @route PUT /user/updateUser/:id
+ * @description Update user's email
+ * @access Private
+ */
+router.put("/updateUser/:id", [
+  auth,
+  sanitizeParam("id"),
+  sanitizeInput("userName"),
+  sanitizeInput("email"),
+  sanitizeInput("password")
+], async (req, res) => {
   try {
     const updates = Object.keys(req.body);
     const allowedUpdates = ['email']; // Add other fields if needed
@@ -59,8 +89,15 @@ router.put("/updateUser/:id", auth, async (req, res) => {
   }
 });
 
-// Delete a user
-router.delete("/deleteUser/:id", auth, async (req, res) => {
+/**
+ * @route DELETE /user/deleteUser/:id
+ * @description Delete a user
+ * @access Private
+ */
+router.delete("/deleteUser/:id", [
+  auth,
+  sanitizeParam("id")
+], async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) {
@@ -76,7 +113,11 @@ router.delete("/deleteUser/:id", auth, async (req, res) => {
   }
 });
 
-// Logout a user
+/**
+ * @route POST /user/logout
+ * @description Logout a user
+ * @access Private
+ */
 router.post("/logout", auth, async (req, res) => {
   try {
     req.user.tokens = req.user.tokens.filter((token) => {
@@ -89,7 +130,11 @@ router.post("/logout", auth, async (req, res) => {
   }
 });
 
-// Logout all sessions
+/**
+ * @route POST /user/logoutAll
+ * @description Logout all sessions
+ * @access Private
+ */
 router.post("/logoutAll", auth, async (req, res) => {
   try {
     req.user.tokens = [];
@@ -100,12 +145,20 @@ router.post("/logoutAll", auth, async (req, res) => {
   }
 });
 
-// Get user profile
+/**
+ * @route GET /user/me
+ * @description Get user profile
+ * @access Private
+ */
 router.get("/me", auth, async (req, res) => {
   res.send(req.user);
 });
 
-// Update user profile
+/**
+ * @route PATCH /user/me
+ * @description Update user profile
+ * @access Private
+ */
 router.patch("/me", auth, async (req, res) => {
   const updates = Object.keys(req.body);
   const allowedUpdates = ['userName', 'email', 'password'];
@@ -124,7 +177,11 @@ router.patch("/me", auth, async (req, res) => {
   }
 });
 
-// Delete user account
+/**
+ * @route DELETE /user/me
+ * @description Delete user account
+ * @access Private
+ */
 router.delete("/me", auth, async (req, res) => {
   try {
     await User.deleteOne({ _id: req.user._id });

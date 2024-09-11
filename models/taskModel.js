@@ -1,11 +1,15 @@
 const mongoose = require("mongoose");
 
-// Define the schema for tasks
+/**
+ * Task Schema
+ * Defines the structure for task documents in the database.
+ */
 const taskSchema = new mongoose.Schema({
     taskDesc: {
         type: String,
         required: true,
-        trim: true // Removes whitespace from both ends of the string
+        trim: true, // Removes whitespace from both ends of the string
+        maxlength: [500, 'Task description cannot be more than 500 characters']
     },
     completed: {
         type: Boolean,
@@ -44,7 +48,11 @@ const taskSchema = new mongoose.Schema({
 // Create a compound index for efficient querying
 taskSchema.index({ owner: 1, completed: 1 });
 
-// Define a pre-save middleware
+/**
+ * Pre-save middleware
+ * Executes before saving a task document.
+ * Can be used for data validation or transformation.
+ */
 taskSchema.pre('save', async function(next) {
     const task = this;
     // Custom logic can be added here, for example:
@@ -55,7 +63,11 @@ taskSchema.pre('save', async function(next) {
     next();
 });
 
-// Define a method to format the task for API responses
+/**
+ * toJSON method
+ * Customizes the JSON representation of the task document.
+ * @returns {Object} The formatted task object
+ */
 taskSchema.methods.toJSON = function() {
     const task = this;
     const taskObject = task.toObject();

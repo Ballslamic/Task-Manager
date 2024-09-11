@@ -1,9 +1,15 @@
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
-const User = require("../models/userModel"); // Import the User model
-const auth = require("../middlewares/auth"); // Import the auth middleware
-require('dotenv').config(); // Load environment variables from .env file
+const User = require("../models/userModel");
+const auth = require("../middlewares/auth");
+const request = require('supertest');
+const app = require('../app');
+require('dotenv').config();
 
+/**
+ * Debug function to log messages when DEBUG environment variable is set.
+ * @param {string} message - The message to log.
+ */
 const debug = (message) => {
   if (process.env.DEBUG) {
     console.log(message);
@@ -11,22 +17,32 @@ const debug = (message) => {
 };
 
 describe('Auth Middleware', () => {
-    let req, res, next, testUser, testToken;
+    let testUser, testToken;
 
+    /**
+     * Set up the test environment before all tests.
+     * Connects to the test database and creates a test user.
+     */
     beforeAll(async () => {
+        // Connect to the test database
         await mongoose.connect(process.env.MONGO_URL, { dbName: process.env.DB_NAME });
         debug('Connected to database');
 
+        // Create a test user
         testUser = new User({
             userName: 'testuser',
             email: 'testuser@example.com',
-            password: 'testpassword123'
+            password: 'TestPassword123!'
         });
         await testUser.save();
         testToken = await testUser.generateAuthToken();
         debug(`Created test user: ${testUser.userName}`);
     });
 
+    /**
+     * Clean up the test environment after all tests.
+     * Deletes the test user and closes the database connection.
+     */
     afterAll(async () => {
         if (testUser) {
             await User.deleteOne({ _id: testUser._id });
@@ -36,90 +52,119 @@ describe('Auth Middleware', () => {
         debug('Disconnected from database');
     });
 
-    beforeEach(() => {
-        req = {
-            header: jest.fn()
-        };
-        res = {
-            status: jest.fn().mockReturnThis(),
-            json: jest.fn(),
-            send: jest.fn()
-        };
-        next = jest.fn();
-        debug('Test setup complete');
-    });
-
-    // Test case: Should authenticate a user with a valid token
+    /**
+     * Test case: Should authenticate a user with a valid token.
+     */
     it('should authenticate a user with a valid token', async () => {
-        req.header.mockReturnValue(`Bearer ${testToken}`);
+        const response = await request(app)
+            .get('/user/me')
+            .set('Authorization', `Bearer ${testToken}`);
 
-        await auth(req, res, next);
-
-        expect(next).toHaveBeenCalled();
-        expect(req.user._id.toString()).toBe(testUser._id.toString());
-        expect(req.token).toBe(testToken);
+        expect(response.status).toBe(200);
+        expect(response.body._id).toBe(testUser._id.toString());
     });
 
-    // Test case: Should not authenticate a user with no token
+    /**
+     * Test case: Should not authenticate a user with no token.
+     */
     it('should not authenticate a user with no token', async () => {
-        req.header.mockReturnValue(undefined);
+        const response = await request(app)
+            .get('/user/me');
 
-        await auth(req, res, next);
-
-        expect(res.status).toHaveBeenCalledWith(401);
-        expect(res.json).toHaveBeenCalledWith({ error: 'Please authenticate.' });
+        expect(response.status).toBe(401);
+        expect(response.body.error).toBe('Please authenticate.');
     });
 
-    // Test case: Should not authenticate a user with an invalid token
+    /**
+     * Test case: Should not authenticate a user with an invalid token.
+     */
     it('should not authenticate a user with an invalid token', async () => {
-        req.header.mockReturnValue('Bearer invalidtoken');
+        const response = await request(app)
+            .get('/user/me')
+            .set('Authorization', 'Bearer invalidtoken');
 
-        await auth(req, res, next);
-
-        expect(res.status).toHaveBeenCalledWith(401);
-        expect(res.json).toHaveBeenCalledWith({ error: 'Please authenticate.' });
+        expect(response.status).toBe(401);
+        expect(response.body.error).toBe('Please authenticate.');
     });
 
-    // Test case: Should not authenticate a user with an expired token
+    /**
+     * Test case: Should not authenticate a user with an expired token.
+     */
     it('should not authenticate a user with an expired token', async () => {
         const expiredToken = jwt.sign({ _id: testUser._id.toString() }, process.env.JWT_SECRET, { expiresIn: '0s' });
-        req.header.mockReturnValue(`Bearer ${expiredToken}`);
+        const response = await request(app)
+            .get('/user/me')
+            .set('Authorization', `Bearer ${expiredToken}`);
 
-        await auth(req, res, next);
-
-        expect(res.status).toHaveBeenCalledWith(401);
-        expect(res.json).toHaveBeenCalledWith({ error: 'Please authenticate.' });
+        expect(response.status).toBe(401);
+        expect(response.body.error).toBe('Please authenticate.');
     });
 
-    // Test case: Should not authenticate a user if token is not in user's tokens array
+    /**
+     * Test case: Should not authenticate a user if token is not in user's tokens array.
+     */
     it('should not authenticate a user if token is not in user\'s tokens array', async () => {
         const invalidToken = jwt.sign({ _id: testUser._id.toString() }, process.env.JWT_SECRET);
-        req.header.mockReturnValue(`Bearer ${invalidToken}`);
-
-        await auth(req, res, next);
-
-        expect(res.status).toHaveBeenCalledWith(401);
-        expect(res.json).toHaveBeenCalledWith({ error: 'Please authenticate.' });
-    });
-
-    // Test case: Should remove expired tokens when authenticating
-    it('should remove expired tokens when authenticating', async () => {
-        const expiredToken = jwt.sign({ _id: testUser._id.toString() }, process.env.JWT_SECRET, { expiresIn: '0s' });
-        testUser.tokens.push({ token: expiredToken, expiresAt: new Date(Date.now() - 1000) });
+        
+        // Ensure the invalidToken is not in the user's tokens array
+        testUser.tokens = testUser.tokens.filter(t => t.token !== invalidToken);
         await testUser.save();
 
-        req.header.mockReturnValue(`Bearer ${testToken}`);
+        const response = await request(app)
+            .get('/user/me')
+            .set('Authorization', `Bearer ${invalidToken}`);
 
-        await auth(req, res, next);
-
-        expect(next).toHaveBeenCalled();
-        const updatedUser = await User.findById(testUser._id);
-        expect(updatedUser.tokens).not.toContainEqual(expect.objectContaining({ token: expiredToken }));
+        expect(response.status).toBe(401);
+        expect(response.body.error).toBe('Please authenticate.');
     });
 
-    afterEach(() => {
-        debug('Test completed');
-        debug(`Response status: ${res.status.mock.calls[0]?.[0]}`);
-        debug(`Response body: ${JSON.stringify(res.json.mock.calls[0]?.[0] || res.send.mock.calls[0]?.[0])}`);
+    /**
+     * Test case: Should remove expired tokens when authenticating.
+     */
+    it('should remove expired tokens when authenticating', async () => {
+        // Create an expired token
+        const expiredToken = jwt.sign({ _id: testUser._id.toString() }, process.env.JWT_SECRET, { expiresIn: '0s' });
+        const expiredDate = new Date(Date.now() - 1000); // 1 second in the past
+        testUser.tokens.push({ token: expiredToken, expiresAt: expiredDate });
+        await testUser.save();
+
+        // Generate a fresh token
+        const freshToken = await testUser.generateAuthToken();
+
+        debug('Before authentication:');
+        debug(`Test user tokens: ${JSON.stringify(testUser.tokens)}`);
+        debug(`Fresh token: ${freshToken}`);
+        debug(`Expired token: ${expiredToken}`);
+
+        // First, verify that the expired token is present
+        let userBeforeAuth = await User.findById(testUser._id);
+        expect(userBeforeAuth.tokens).toContainEqual(expect.objectContaining({ token: expiredToken }));
+
+        // Perform authentication with the fresh token
+        const response = await request(app)
+            .get('/user/me')
+            .set('Authorization', `Bearer ${freshToken}`);
+
+        debug('After authentication:');
+        debug(`Response status: ${response.status}`);
+        debug(`Response body: ${JSON.stringify(response.body)}`);
+
+        // Check if authentication was successful
+        expect(response.status).toBe(200);
+        
+        // Check if expired token was removed
+        const updatedUser = await User.findById(testUser._id);
+        debug(`Updated user tokens: ${JSON.stringify(updatedUser.tokens)}`);
+
+        // Log each token separately for clarity
+        updatedUser.tokens.forEach((t, index) => {
+            debug(`Token ${index}: ${t.token}`);
+            debug(`Expires at: ${t.expiresAt}`);
+            debug(`Is expired token: ${t.token === expiredToken}`);
+            debug(`Is fresh token: ${t.token === freshToken}`);
+        });
+
+        expect(updatedUser.tokens).not.toContainEqual(expect.objectContaining({ token: expiredToken }));
+        expect(updatedUser.tokens).toContainEqual(expect.objectContaining({ token: freshToken }));
     });
 });

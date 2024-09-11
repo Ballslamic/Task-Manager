@@ -7,55 +7,56 @@ const User = require('../models/userModel'); // Import the User model
 
 const TEST_USER_PREFIX = 'testuser_';
 
+/**
+ * User Routes Test Suite
+ * 
+ * These tests cover the CRUD operations for users, including
+ * registration, login, profile updates, and account deletion.
+ * They also test for proper authentication and error handling.
+ */
 describe('User Routes', () => {
     let testUser;
     let testUserToken;
 
     beforeAll(async () => {
         await mongoose.connect(process.env.MONGO_URL, { dbName: process.env.DB_NAME });
-        console.log('Connected to database');
     });
 
     afterAll(async () => {
         await User.deleteMany({ userName: new RegExp(`^${TEST_USER_PREFIX}`) });
         await mongoose.connection.close();
-        console.log('Disconnected from database');
     });
 
     beforeEach(async () => {
         await User.deleteMany({ userName: new RegExp(`^${TEST_USER_PREFIX}`) });
         
+        // Create a test user for authenticated routes
         testUser = await User.create({
             userName: `${TEST_USER_PREFIX}${Date.now()}`,
             email: `testuser_${Date.now()}@example.com`,
-            password: 'testpassword123'
+            password: 'TestPassword123!'
         });
-        console.log(`Created test user: ${testUser.userName}`);
 
+        // Log in the test user to get a token
         const loginRes = await request(app)
             .post('/user/login')
             .send({
                 email: testUser.email,
-                password: 'testpassword123'
+                password: 'TestPassword123!'
             });
         testUserToken = loginRes.body.token;
     });
 
-    afterEach(async () => {
-        if (testUser) {
-            await User.findByIdAndDelete(testUser._id);
-            console.log(`Deleted test user: ${testUser.userName}`);
-        }
-    });
-
-    // Test case: Should register a new user
+    /**
+     * Test case: Should register a new user
+     */
     it('should register a new user', async () => {
         const res = await request(app)
             .post('/user/register')
             .send({
                 userName: `${TEST_USER_PREFIX}new`,
                 email: 'newuser@example.com',
-                password: 'newpassword123'
+                password: 'NewPassword123!'
             });
         
         expect(res.statusCode).toBe(201);
@@ -63,13 +64,15 @@ describe('User Routes', () => {
         expect(res.body).toHaveProperty('token');
     });
 
-    // Test case: Should login a user
+    /**
+     * Test case: Should login an existing user
+     */
     it('should login an existing user', async () => {
         const res = await request(app)
             .post('/user/login')
             .send({
                 email: testUser.email,
-                password: 'testpassword123'
+                password: 'TestPassword123!'
             });
         
         expect(res.statusCode).toBe(200);
@@ -77,7 +80,9 @@ describe('User Routes', () => {
         expect(res.body).toHaveProperty('token');
     });
 
-    // Test case: Should get user profile
+    /**
+     * Test case: Should get user profile
+     */
     it('should get user profile', async () => {
         const res = await request(app)
             .get('/user/me')
@@ -88,7 +93,9 @@ describe('User Routes', () => {
         expect(res.body).toHaveProperty('email', testUser.email);
     });
 
-    // Test case: Should update a user's email
+    /**
+     * Test case: Should update user profile
+     */
     it('should update user profile', async () => {
         const res = await request(app)
             .patch('/user/me')
@@ -101,7 +108,9 @@ describe('User Routes', () => {
         expect(res.body).toHaveProperty('userName', `${TEST_USER_PREFIX}updated`);
     });
 
-    // Test case: Should logout a user
+    /**
+     * Test case: Should logout user
+     */
     it('should logout user', async () => {
         const res = await request(app)
             .post('/user/logout')
@@ -110,15 +119,13 @@ describe('User Routes', () => {
         expect(res.statusCode).toBe(200);
     });
 
-    // Test case: Should delete a user
+    /**
+     * Test case: Should delete user account
+     */
     it('should delete user account', async () => {
         const res = await request(app)
             .delete('/user/me')
             .set('Authorization', `Bearer ${testUserToken}`);
-        
-        if (res.statusCode !== 200) {
-            console.log('Delete user response:', res.body);
-        }
         
         expect(res.statusCode).toBe(200);
         

@@ -1,13 +1,29 @@
 const express = require('express');
-const router = express.Router();
-const auth = require('../middlewares/auth'); // Ensure auth middleware is required
+const mongoose = require('mongoose'); // Add this line
+const { sanitizeInput, sanitizeParam, validateObjectId } = require('../middlewares/sanitize');
 const Task = require('../models/taskModel');
+const auth = require('../middlewares/auth');
 
-// Create a new task
-router.post('/createTask', auth, async (req, res) => {
+const router = express.Router();
+
+/**
+ * @route POST /task/createTask
+ * @description Create a new task
+ * @access Private
+ */
+router.post('/createTask', [
+    auth,
+    sanitizeInput('taskDesc'),
+    validateObjectId('category')
+], async (req, res) => {
     try {
         const { taskDesc, category } = req.body;
-        const owner = req.user._id; // Use the authenticated user's ID
+        const owner = req.user._id;
+
+        // Validate category
+        if (!mongoose.Types.ObjectId.isValid(category)) {
+            return res.status(400).json({ error: 'Invalid category ID' });
+        }
 
         const newTask = new Task({
             taskDesc,
@@ -19,12 +35,24 @@ router.post('/createTask', auth, async (req, res) => {
         res.status(201).json({ task: newTask, message: 'Task created successfully' });
     } catch (error) {
         console.error("Error creating task:", error);
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-// Update an existing task
-router.put('/updateTask/:id', auth, async (req, res) => {
+/**
+ * @route PUT /task/updateTask/:id
+ * @description Update an existing task
+ * @access Private
+ */
+router.put('/updateTask/:id', [
+    auth,
+    sanitizeParam('id'),
+    sanitizeInput('taskDesc'),
+    validateObjectId('category')
+], async (req, res) => {
     try {
         const task = await Task.findById(req.params.id);
         if (!task) {
@@ -54,8 +82,15 @@ router.put('/updateTask/:id', auth, async (req, res) => {
     }
 });
 
-// Delete a task
-router.delete('/deleteTask/:id', auth, async (req, res) => {
+/**
+ * @route DELETE /task/deleteTask/:id
+ * @description Delete a task
+ * @access Private
+ */
+router.delete('/deleteTask/:id', [
+    auth,
+    sanitizeParam('id')
+], async (req, res) => {
     try {
         const task = await Task.findOneAndDelete({ _id: req.params.id, owner: req.user._id });
         if (!task) {
@@ -68,7 +103,11 @@ router.delete('/deleteTask/:id', auth, async (req, res) => {
     }
 });
 
-// Get all tasks for the authenticated user
+/**
+ * @route GET /task/getTasks
+ * @description Get all tasks for the authenticated user
+ * @access Private
+ */
 router.get('/getTasks', auth, async (req, res) => {
     try {
         const tasks = await Task.find({ owner: req.user._id });
