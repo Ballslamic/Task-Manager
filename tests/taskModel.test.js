@@ -23,7 +23,7 @@ describe('Task Model', () => {
         testUser = await User.create({ 
             userName: 'TestUser', 
             email: 'testuser@example.com', 
-            password: 'TestPassword123!' // This should meet the password requirements
+            password: 'TestPassword123!' 
         });
         testCategory = {
             name: 'Work',
@@ -31,7 +31,7 @@ describe('Task Model', () => {
         };
         testUser.categories.push(testCategory);
         await testUser.save();
-        testCategory = testUser.categories[0]; // Get the saved category with _id
+        testCategory = testUser.categories[0]; 
     });
 
     /**
